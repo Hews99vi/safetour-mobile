@@ -7,11 +7,13 @@ const notificationService = require('./notificationService');
 
 const allowedMessageTypes = ['text', 'location', 'image'];
 const roomMembers = new Map();
+let ioInstance;
 
 function initializeChatService(httpServer) {
   const io = new Server(httpServer, {
     cors: { origin: '*' }
   });
+  ioInstance = io;
 
   io.use(authenticateSocket);
 
@@ -100,6 +102,10 @@ function initializeChatService(httpServer) {
   });
 
   return io;
+}
+
+function getIo() {
+  return ioInstance;
 }
 
 function authenticateSocket(socket, next) {
@@ -241,4 +247,4 @@ async function notifyAdmins(roomId, content) {
   );
 }
 
-module.exports = { initializeChatService };
+module.exports = { initializeChatService, getIo };

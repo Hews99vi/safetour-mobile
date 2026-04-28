@@ -3,6 +3,7 @@ const { validationResult } = require('express-validator');
 const SosReport = require('../models/SosReport');
 const User = require('../models/User');
 const notificationService = require('../services/notificationService');
+const { getIo } = require('../services/chatService');
 
 const activeStatuses = ['pending', 'acknowledged'];
 
@@ -45,6 +46,16 @@ function requireRole(req, res, role) {
   return true;
 }
 
+function emitSosEvent(eventName, report) {
+  const io = getIo();
+  if (!io) return;
+  io.emit(eventName, { report });
+}
+
+async function populateSosReport(report) {
+  return report.populate('userId', 'email displayName');
+}
+
 async function reportSos(req, res, next) {
   try {
     if (sendValidationErrors(req, res)) return;
@@ -64,6 +75,7 @@ async function reportSos(req, res, next) {
       emergencyType,
       description
     });
+    const populatedReport = await populateSosReport(report);
 
     const authorities = await User.find({
       role: 'admin',
@@ -90,6 +102,7 @@ async function reportSos(req, res, next) {
       status: 'pending',
       message: 'Help is on the way'
     });
+    emitSosEvent('sos_new', populatedReport);
   } catch (error) {
     next(error);
   }
@@ -118,8 +131,10 @@ async function cancelSos(req, res, next) {
 
     report.status = 'cancelled';
     const updated = await report.save();
+    const populatedReport = await populateSosReport(updated);
 
-    res.json(updated);
+    res.json(populatedReport);
+    emitSosEvent('sos_updated', populatedReport);
   } catch (error) {
     next(error);
   }
@@ -175,6 +190,7 @@ async function updateSosStatus(req, res, next) {
     }
 
     res.json(updated);
+    emitSosEvent('sos_updated', updated);
   } catch (error) {
     next(error);
   }

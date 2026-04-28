@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_providers.dart';
 import 'notification_providers.dart';
-import 'safety_providers.dart';
 
 class AuthState {
   const AuthState({
@@ -84,19 +83,6 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<void> developerLogin() async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
-    try {
-      await ref.read(secureStorageProvider).writeToken('dev-token');
-      state = state.copyWith(isLoading: false, isAuthenticated: true);
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Developer login failed.',
-      );
-    }
-  }
-
   void clearError() {
     if (state.errorMessage != null) {
       state = state.copyWith(errorMessage: null);
@@ -133,7 +119,7 @@ class AuthController extends Notifier<AuthState> {
   }
 
   bool _isEmailValid(String email) {
-    final regex = RegExp(r'^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$');
+    final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
     return regex.hasMatch(email.trim());
   }
 

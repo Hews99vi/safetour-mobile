@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -98,20 +97,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     );
                               },
                       ),
-                      if (kDebugMode) ...[
-                        const SizedBox(height: 12),
-                        GlowButton(
-                          label: 'Developer Login',
-                          isLoading: state.isLoading,
-                          onPressed: state.isLoading
-                              ? null
-                              : () {
-                                  ref
-                                      .read(authControllerProvider.notifier)
-                                      .developerLogin();
-                                },
-                        ),
-                      ],
                       const SizedBox(height: 16),
                       Center(
                         child: TextButton(

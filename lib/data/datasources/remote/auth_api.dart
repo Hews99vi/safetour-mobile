@@ -28,7 +28,7 @@ class AuthApi {
   }) async {
     final response = await _dio.post(
       '/auth/register',
-      data: {'name': name, 'email': email, 'password': password},
+      data: {'displayName': name, 'email': email, 'password': password},
     );
     final data = response.data as Map<String, dynamic>;
     final token = data['token'] as String?;
