@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 
 import 'package:flutter/material.dart';
 
+import '../utils/jwt_utils.dart';
+import '../../presentation/providers/safety_providers.dart';
+import '../../presentation/screens/authority/authority_sos_screen.dart';
 import '../../presentation/screens/auth/login_screen.dart';
 import '../../presentation/screens/auth/register_screen.dart';
 import '../../presentation/screens/alerts/alerts_feed_screen.dart';
@@ -12,11 +15,15 @@ import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/map/map_screen.dart';
 import '../../presentation/screens/profile/profile_screen.dart';
 import '../../presentation/screens/sos/confirm_sos_screen.dart';
+import '../../presentation/screens/sos/sos_status_screen.dart';
 import '../../presentation/screens/sos/sos_success_screen.dart';
 import '../../presentation/screens/vpn/vpn_screen.dart';
 
+final appRouterKey = GlobalKey<NavigatorState>();
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
+    navigatorKey: appRouterKey,
     initialLocation: '/login',
     routes: [
       GoRoute(
@@ -70,8 +77,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'sos-success',
             name: 'sos-success',
-            pageBuilder: (context, state) =>
-                _fadeSlideTransition(state, const SOSSentScreen()),
+            pageBuilder: (context, state) => _fadeSlideTransition(
+              state,
+              SOSSentScreen(sosId: state.uri.queryParameters['sosId']),
+            ),
+          ),
+          GoRoute(
+            path: 'sos/status',
+            name: 'sos-status',
+            pageBuilder: (context, state) => _fadeSlideTransition(
+              state,
+              SosStatusScreen(sosId: state.uri.queryParameters['sosId']),
+            ),
           ),
           GoRoute(
             path: 'sos-confirm',
@@ -86,6 +103,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 _fadeSlideTransition(state, const ProfileScreen()),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/authority/sos',
+        name: 'authority-sos',
+        redirect: (context, state) async {
+          final token = await ref.read(secureStorageProvider).readToken();
+          final payload = token == null ? null : decodeJwtPayload(token);
+          if (payload?.role != 'admin') return '/';
+          return null;
+        },
+        pageBuilder: (context, state) =>
+            _fadeSlideTransition(state, const AuthoritySosScreen()),
       ),
     ],
   );

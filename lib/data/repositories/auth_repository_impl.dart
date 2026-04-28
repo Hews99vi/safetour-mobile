@@ -9,10 +9,7 @@ class AuthRepositoryImpl implements AuthRepository {
   final SecureStorageService _storage;
 
   @override
-  Future<void> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> login({required String email, required String password}) async {
     final token = await _api.login(email: email, password: password);
     await _storage.writeToken(token);
   }
@@ -30,4 +27,7 @@ class AuthRepositoryImpl implements AuthRepository {
     );
     await _storage.writeToken(token);
   }
+
+  @override
+  Future<void> updateFcmToken(String token) => _api.updateFcmToken(token);
 }

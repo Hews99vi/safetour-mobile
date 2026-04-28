@@ -19,8 +19,7 @@ class _AppRootState extends ConsumerState<AppRoot> {
   void initState() {
     super.initState();
     ref.read(pushNotificationProvider).init();
-    final router = ref.read(appRouterProvider);
-    ref.read(notificationServiceProvider).init(router);
+    ref.read(notificationServiceProvider).initialise();
   }
 
   @override

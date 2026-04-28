@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
-import '../../providers/message_provider.dart';
+import '../../../data/models/chat_message.dart';
+import '../../providers/chat_provider.dart';
+import '../../providers/safe_tour_providers.dart';
 import '../../widgets/glass_card.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -28,20 +30,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(messageProvider);
-    ref.listen<ChatState>(messageProvider, (prev, next) {
-      if (prev?.messages.length != next.messages.length) {
-        Future.microtask(() {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 280),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-      }
-    });
+    final roomAsync = ref.watch(chatRoomProvider);
+    final connected = ref.watch(chatConnectionProvider).value ?? false;
 
     return Scaffold(
       backgroundColor: AppColors.midnight,
@@ -52,9 +42,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             Text(
               'Connected to Tourist Police',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.ice,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: AppColors.ice,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 4),
             Row(
@@ -62,83 +52,130 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.neonLime,
+                    color: connected ? AppColors.neonLime : AppColors.danger,
                   ),
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'Online',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.mist,
-                      ),
+                  connected ? 'Online' : 'Offline',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.mist),
                 ),
               ],
             ),
           ],
         ),
-        actions: [
-          Semantics(
-            label: 'Call Tourist Police',
-            child: IconButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Calling Tourist Police (mock)')),
-                );
-              },
-              icon: const Icon(Icons.call, color: AppColors.ice),
-            ),
-          ),
-        ],
       ),
       body: Stack(
         children: [
           const _Backdrop(),
-          Column(
-            children: [
-              Expanded(
-                child: state.messages.isEmpty && !state.isTyping
-                    ? const _EmptyState()
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        itemCount:
-                            state.messages.length + (state.isTyping ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (state.isTyping &&
-                              index == state.messages.length) {
-                            return const _TypingIndicator();
-                          }
-                          final message = state.messages[index];
-                          return _MessageBubble(message: message);
-                        },
-                      ),
-              ),
-              _QuickReplies(
-                onTap: (text) {
-                  ref.read(messageProvider.notifier).sendMessage(text);
-                },
-              ),
-              _Composer(
+          roomAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, _) =>
+                const _UnavailableState(message: 'Unable to prepare chat.'),
+            data: (roomId) {
+              if (roomId == null || roomId.isEmpty) {
+                return const _UnavailableState(
+                  message: 'Please log in as a tourist to use chat.',
+                );
+              }
+
+              return _ChatBody(
+                roomId: roomId,
                 controller: _controller,
-                isSending: state.isSending,
-                onSend: () {
-                  ref
-                      .read(messageProvider.notifier)
-                      .sendMessage(_controller.text);
-                  _controller.clear();
-                },
-                onAttach: () => _showAttachSheet(context),
-              ),
-            ],
+                scrollController: _scrollController,
+              );
+            },
           ),
         ],
       ),
     );
   }
+}
 
-  void _showAttachSheet(BuildContext context) {
+class _ChatBody extends ConsumerWidget {
+  const _ChatBody({
+    required this.roomId,
+    required this.controller,
+    required this.scrollController,
+  });
+
+  final String roomId;
+  final TextEditingController controller;
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(chatMessagesProvider(roomId));
+    final isTyping = ref.watch(typingProvider(roomId));
+
+    ref.listen<ChatMessagesState>(chatMessagesProvider(roomId), (prev, next) {
+      if (prev?.messages.length != next.messages.length) {
+        Future<void>.microtask(() {
+          if (scrollController.hasClients) {
+            scrollController.animateTo(
+              scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+
+      final error = next.errorMessage;
+      if (error != null && error != prev?.errorMessage) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
+      }
+    });
+
+    return Column(
+      children: [
+        Expanded(
+          child: state.isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : state.messages.isEmpty && !isTyping
+              ? const _EmptyState()
+              : ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  itemCount: state.messages.length + (isTyping ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (isTyping && index == state.messages.length) {
+                      return const _TypingIndicator();
+                    }
+
+                    return _MessageBubble(message: state.messages[index]);
+                  },
+                ),
+        ),
+        _QuickReplies(
+          onTap: (text) {
+            ref.read(chatMessagesProvider(roomId).notifier).sendText(text);
+          },
+        ),
+        _Composer(
+          controller: controller,
+          isSending: state.isSending,
+          onChanged: (_) {
+            ref.read(chatMessagesProvider(roomId).notifier).sendTyping();
+          },
+          onSend: () {
+            final text = controller.text;
+            controller.clear();
+            ref.read(chatMessagesProvider(roomId).notifier).sendText(text);
+          },
+          onAttach: () => _showAttachSheet(context, ref, roomId),
+        ),
+      ],
+    );
+  }
+
+  void _showAttachSheet(BuildContext context, WidgetRef ref, String roomId) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -151,13 +188,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const Icon(Icons.my_location, color: AppColors.neonCyan),
+                  leading: const Icon(
+                    Icons.my_location,
+                    color: AppColors.neonCyan,
+                  ),
                   title: const Text('Send My Location'),
                   onTap: () {
                     Navigator.of(context).pop();
+                    final location = ref.read(locationProvider).value;
+                    if (location == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Location unavailable')),
+                      );
+                      return;
+                    }
+
                     ref
-                        .read(messageProvider.notifier)
-                        .sendMessage('📍 My location: 37.7749, -122.4194');
+                        .read(chatMessagesProvider(roomId).notifier)
+                        .sendLocation(location.latitude, location.longitude);
                   },
                 ),
               ],
@@ -169,18 +217,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 }
 
-class _MessageBubble extends ConsumerWidget {
+class _MessageBubble extends StatelessWidget {
   const _MessageBubble({required this.message});
 
   final ChatMessage message;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isUser = message.sender == ChatSender.user;
+  Widget build(BuildContext context) {
+    final isUser = message.senderRole == ChatSenderRole.tourist;
     final bubbleColor = isUser
-        ? const LinearGradient(
-            colors: [Color(0xFF38BDF8), Color(0xFF0EA5E9)],
-          )
+        ? const LinearGradient(colors: [Color(0xFF38BDF8), Color(0xFF0EA5E9)])
         : null;
     final bubbleDecoration = BoxDecoration(
       gradient: bubbleColor,
@@ -189,25 +235,25 @@ class _MessageBubble extends ConsumerWidget {
       border: isUser ? null : Border.all(color: AppColors.glassStroke),
       boxShadow: [
         BoxShadow(
-          color: (isUser ? AppColors.neonCyan : Colors.black)
-              .withValues(alpha: 0.25),
+          color: (isUser ? AppColors.neonCyan : Colors.black).withValues(
+            alpha: 0.25,
+          ),
           blurRadius: 16,
           offset: const Offset(0, 8),
         ),
       ],
     );
 
-    final failed = message.status == ChatMessageStatus.failed;
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: Column(
-        crossAxisAlignment:
-            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           TweenAnimationBuilder<double>(
             duration: const Duration(milliseconds: 280),
-            tween: Tween(begin: message.animateOnArrival ? 0.0 : 1.0, end: 1.0),
+            tween: Tween(begin: 0, end: 1),
             curve: Curves.easeOut,
             builder: (context, value, child) {
               final offset = Offset(0, 12 * (1 - value));
@@ -218,93 +264,31 @@ class _MessageBubble extends ConsumerWidget {
             },
             child: Semantics(
               label:
-                  '${isUser ? 'User' : 'Authority'} message: ${message.text}',
+                  '${isUser ? 'User' : 'Authority'} message: ${message.content}',
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 290),
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md,
                   vertical: AppSpacing.sm,
                 ),
-                decoration: bubbleDecoration.copyWith(
-                  border: failed
-                      ? Border.all(color: AppColors.danger, width: 1.4)
-                      : bubbleDecoration.border,
-                ),
+                decoration: bubbleDecoration,
                 child: Column(
-                  crossAxisAlignment:
-                      isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  crossAxisAlignment: isUser
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            message.text,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: isUser ? AppColors.midnight : AppColors.ice,
-                                ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: () {
-                            ref
-                                .read(messageProvider.notifier)
-                                .translateMessage(message);
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: Icon(
-                              Icons.translate,
-                              size: 16,
-                              color: isUser ? AppColors.midnight : AppColors.ice,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      _displayContent(message),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: isUser ? AppColors.midnight : AppColors.ice,
+                      ),
                     ),
-                    if (message.isTranslating)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          'Translating...',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: isUser ? AppColors.midnight : AppColors.mist,
-                              ),
-                        ),
-                      ),
-                    if (message.translatedText != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          message.translatedText!,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: isUser ? AppColors.midnight : AppColors.ice,
-                              ),
-                        ),
-                      ),
                     const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _formatTime(message.timestamp),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: isUser ? AppColors.midnight : AppColors.mist,
-                              ),
-                        ),
-                        if (failed) ...[
-                          const SizedBox(width: 8),
-                          TextButton(
-                            onPressed: () {
-                              ref
-                                  .read(messageProvider.notifier)
-                                  .retryMessage(message);
-                            },
-                            child: const Text('Retry'),
-                          ),
-                        ],
-                      ],
+                    Text(
+                      _formatTime(message.createdAt),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isUser ? AppColors.midnight : AppColors.mist,
+                      ),
                     ),
                   ],
                 ),
@@ -314,6 +298,15 @@ class _MessageBubble extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  String _displayContent(ChatMessage message) {
+    final location = message.locationData;
+    if (message.messageType == ChatMessageType.location && location != null) {
+      return 'My location: ${location.lat.toStringAsFixed(5)}, ${location.lng.toStringAsFixed(5)}';
+    }
+
+    return message.content;
   }
 
   String _formatTime(DateTime time) {
@@ -409,12 +402,14 @@ class _Composer extends StatelessWidget {
     required this.onSend,
     required this.isSending,
     required this.onAttach,
+    required this.onChanged,
   });
 
   final TextEditingController controller;
   final VoidCallback onSend;
   final bool isSending;
   final VoidCallback onAttach;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -433,21 +428,23 @@ class _Composer extends StatelessWidget {
               Semantics(
                 label: 'Attach options',
                 child: IconButton(
-                  onPressed: onAttach,
+                  onPressed: isSending ? null : onAttach,
                   icon: const Icon(Icons.attach_file, color: AppColors.ice),
                 ),
               ),
               Expanded(
                 child: TextField(
                   controller: controller,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.ice,
-                      ),
+                  onChanged: onChanged,
+                  enabled: !isSending,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppColors.ice),
                   decoration: InputDecoration(
                     hintText: 'Type message...',
-                    hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.mist,
-                        ),
+                    hintStyle: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.mist),
                     filled: true,
                     fillColor: AppColors.deepSpace,
                     border: OutlineInputBorder(
@@ -475,7 +472,15 @@ class _Composer extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.send, color: AppColors.midnight),
+                  child: isSending
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.midnight,
+                          ),
+                        )
+                      : const Icon(Icons.send, color: AppColors.midnight),
                 ),
               ),
             ],
@@ -524,9 +529,9 @@ class _Chip extends StatelessWidget {
       child: ActionChip(
         onPressed: onTap,
         label: Text(label),
-        labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: AppColors.ice,
-            ),
+        labelStyle: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(color: AppColors.ice),
         backgroundColor: AppColors.glassFill,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
@@ -553,11 +558,33 @@ class _EmptyState extends StatelessWidget {
             Text(
               'No messages yet',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.ice,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: AppColors.ice,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UnavailableState extends StatelessWidget {
+  const _UnavailableState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: GlassCard(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.ice),
         ),
       ),
     );

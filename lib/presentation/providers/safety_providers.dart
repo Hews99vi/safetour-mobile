@@ -8,7 +8,6 @@ import '../../core/storage/secure_storage_service.dart';
 import '../../data/datasources/remote/safety_api.dart';
 import '../../data/repositories/safety_repository_impl.dart';
 import '../../data/services/push_notification_service.dart';
-import '../../domain/entities/alert.dart';
 import '../../domain/repositories/safety_repository.dart';
 
 final secureStorageProvider = Provider<SecureStorageService>((ref) {
@@ -26,11 +25,6 @@ final safetyApiProvider = Provider<SafetyApi>((ref) {
 
 final safetyRepositoryProvider = Provider<SafetyRepository>((ref) {
   return SafetyRepositoryImpl(ref.watch(safetyApiProvider));
-});
-
-final alertsProvider = FutureProvider<List<Alert>>((ref) async {
-  final repository = ref.watch(safetyRepositoryProvider);
-  return repository.getRecentAlerts();
 });
 
 final pushNotificationProvider = Provider<PushNotificationService>((ref) {

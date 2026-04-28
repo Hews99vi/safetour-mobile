@@ -1,0 +1,54 @@
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
+    transform: scale(1.12);
+  }
+}
+
+.sos-pulse {
+  width: 22px;
+  height: 22px;
+  background: #ef4444;
+  border: 2px solid white;
+  border-radius: 9999px;
+  animation: pulse 1.5s ease-in-out infinite;
+  position: relative;
+}
+
+.sos-pulse::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-right: 2px solid white;
+  border-bottom: 2px solid white;
+  transform: translate(-50%, -4px) rotate(45deg);
+}
+
+.marker-pin {
+  width: 20px;
+  height: 20px;
+  border: 2px solid white;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+}
+
+.pin-police   { background: #3b82f6; }
+.pin-hospital { background: #ef4444; }
+.pin-embassy  { background: #a855f7; }
+.pin-safe     { background: #22c55e; }
+
+.alert-triangle {
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 18px solid #f97316;
+}

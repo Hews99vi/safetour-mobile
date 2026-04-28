@@ -11,7 +11,9 @@ import '../../widgets/glass_card.dart';
 enum SosSentPhase { sending, assigned, resolved, error }
 
 class SOSSentScreen extends StatefulWidget {
-  const SOSSentScreen({super.key});
+  const SOSSentScreen({super.key, this.sosId});
+
+  final String? sosId;
 
   @override
   State<SOSSentScreen> createState() => _SOSSentScreenState();
@@ -128,10 +130,17 @@ class _SOSSentScreenState extends State<SOSSentScreen>
                   const SizedBox(height: AppSpacing.sm),
                   const _MapSnapshot(),
                   const SizedBox(height: AppSpacing.md),
-                  _ResponderPanel(
-                    phase: _phase,
-                    eta: _formatEta(_etaSeconds),
-                  ),
+                  if (widget.sosId != null && widget.sosId!.isNotEmpty) ...[
+                    Text(
+                      'SOS ID: ${widget.sosId}',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.mist),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  _ResponderPanel(phase: _phase, eta: _formatEta(_etaSeconds)),
                   const SizedBox(height: AppSpacing.sm),
                   if (_phase == SosSentPhase.assigned && _cancelWindow > 0)
                     Semantics(
@@ -152,9 +161,8 @@ class _SOSSentScreenState extends State<SOSSentScreen>
                           const SizedBox(height: AppSpacing.sm),
                           Text(
                             'Unable to assign a responder.',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: AppColors.ice,
-                                ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: AppColors.ice),
                           ),
                           const SizedBox(height: AppSpacing.sm),
                           ElevatedButton(
@@ -171,7 +179,9 @@ class _SOSSentScreenState extends State<SOSSentScreen>
                               _assignTimer = Timer(
                                 const Duration(seconds: 2),
                                 () {
-                                  setState(() => _phase = SosSentPhase.assigned);
+                                  setState(
+                                    () => _phase = SosSentPhase.assigned,
+                                  );
                                   _checkController.forward();
                                   _startCountdowns();
                                 },
@@ -186,8 +196,8 @@ class _SOSSentScreenState extends State<SOSSentScreen>
                     Text(
                       'Case resolved. Stay safe.',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppColors.neonLime,
-                          ),
+                        color: AppColors.neonLime,
+                      ),
                     ),
                 ],
               ),
@@ -206,24 +216,21 @@ class _SOSSentScreenState extends State<SOSSentScreen>
 }
 
 class _StatusHeader extends StatelessWidget {
-  const _StatusHeader({
-    required this.phase,
-    required this.checkController,
-  });
+  const _StatusHeader({required this.phase, required this.checkController});
 
   final SosSentPhase phase;
   final AnimationController checkController;
 
   @override
   Widget build(BuildContext context) {
-    final showCheck = phase == SosSentPhase.assigned || phase == SosSentPhase.resolved;
+    final showCheck =
+        phase == SosSentPhase.assigned || phase == SosSentPhase.resolved;
     return Column(
       children: [
         AnimatedBuilder(
           animation: checkController,
           builder: (context, child) {
-            final scale =
-                showCheck ? (0.6 + checkController.value * 0.4) : 1.0;
+            final scale = showCheck ? (0.6 + checkController.value * 0.4) : 1.0;
             return Transform.scale(
               scale: scale,
               child: Container(
@@ -253,16 +260,16 @@ class _StatusHeader extends StatelessWidget {
         Text(
           'Help is on the way',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: AppColors.ice,
-                fontWeight: FontWeight.w700,
-              ),
+            color: AppColors.ice,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
           'Stay where you are',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.mist,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.mist),
         ),
       ],
     );
@@ -323,10 +330,7 @@ class _MapLinesPainter extends CustomPainter {
 }
 
 class _ResponderPanel extends StatelessWidget {
-  const _ResponderPanel({
-    required this.phase,
-    required this.eta,
-  });
+  const _ResponderPanel({required this.phase, required this.eta});
 
   final SosSentPhase phase;
   final String eta;
@@ -352,11 +356,13 @@ class _ResponderPanel extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  phase == SosSentPhase.assigned ? 'Officer Maya Reed' : 'Assigning responder',
+                  phase == SosSentPhase.assigned
+                      ? 'Officer Maya Reed'
+                      : 'Assigning responder',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.ice,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: AppColors.ice,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 AnimatedSwitcher(
@@ -376,9 +382,9 @@ class _ResponderPanel extends StatelessWidget {
                   child: Text(
                     'ETA: $eta',
                     key: ValueKey<String>(eta),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.mist,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.mist),
                   ),
                 ),
               ],
@@ -393,9 +399,9 @@ class _ResponderPanel extends StatelessWidget {
             child: Text(
               phase == SosSentPhase.assigned ? 'En Route' : 'Sending',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.neonCyan,
-                    fontSize: 11,
-                  ),
+                color: AppColors.neonCyan,
+                fontSize: 11,
+              ),
             ),
           ),
         ],

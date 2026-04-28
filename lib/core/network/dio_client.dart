@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../config/backend_config.dart';
 import '../storage/secure_storage_service.dart';
 
 class DioClient {
@@ -10,7 +11,7 @@ class DioClient {
   Dio build() {
     final dio = Dio(
       BaseOptions(
-        baseUrl: 'https://api.safetour.app',
+        baseUrl: BackendConfig.apiBaseUrl,
         connectTimeout: const Duration(seconds: 20),
         receiveTimeout: const Duration(seconds: 20),
       ),

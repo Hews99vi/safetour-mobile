@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
+import '../../../data/models/alert.dart';
 import '../../providers/alerts_feed_provider.dart';
+import '../../providers/safe_tour_providers.dart';
 import '../../widgets/glass_card.dart';
 
 class AlertsFeedScreen extends ConsumerWidget {
@@ -13,8 +15,9 @@ class AlertsFeedScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final alerts = ref.watch(alertsProvider);
-    final filter = ref.watch(alertFilterProvider);
+    final alerts = ref.watch(filteredAlertsProvider);
+    final filter = ref.watch(alertTypeFilterProvider);
+    final location = ref.watch(locationProvider).value;
 
     return Scaffold(
       appBar: AppBar(
@@ -36,35 +39,45 @@ class AlertsFeedScreen extends ConsumerWidget {
                   _AlertFilter(
                     selected: filter,
                     onSelected: (value) => ref
-                        .read(alertFilterProvider.notifier)
+                        .read(alertTypeFilterProvider.notifier)
                         .setFilter(value),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Expanded(
-                    child: alerts.when(
-                      loading: () => const _AlertShimmerList(),
-                      error: (err, stack) => _AlertError(
-                        onRetry: () =>
-                            ref.read(alertsProvider.notifier).retry(),
-                      ),
-                      data: (items) {
-                        final filtered = _filterItems(items, filter);
-                        if (filtered.isEmpty) {
-                          return const _AlertEmpty();
+                    child: RefreshIndicator(
+                      onRefresh: () async {
+                        ref.invalidate(alertsProvider);
+                        try {
+                          await ref.read(alertsProvider.future);
+                        } catch (_) {
+                          // The visible error state handles failed refreshes.
                         }
-                        return ListView.separated(
-                          itemCount: filtered.length,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(height: AppSpacing.sm),
-                          itemBuilder: (context, index) {
-                            final alert = filtered[index];
-                            return _AlertCard(
-                              alert: alert,
-                              index: index,
-                            );
-                          },
-                        );
                       },
+                      child: alerts.when(
+                        loading: () => const _AlertShimmerList(),
+                        error: (err, stack) => _AlertError(
+                          onRetry: () => ref.invalidate(alertsProvider),
+                        ),
+                        data: (items) {
+                          if (items.isEmpty) {
+                            return const _AlertEmpty();
+                          }
+
+                          return ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            itemCount: items.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: AppSpacing.sm),
+                            itemBuilder: (context, index) {
+                              return _AlertCard(
+                                alert: items[index],
+                                userLat: location?.latitude,
+                                userLng: location?.longitude,
+                              );
+                            },
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ],
@@ -75,49 +88,49 @@ class AlertsFeedScreen extends ConsumerWidget {
       ),
     );
   }
-
-  List<AlertItem> _filterItems(List<AlertItem> items, AlertType? filter) {
-    if (filter == null) return items;
-    return items.where((item) => item.type == filter).toList();
-  }
 }
 
 class _AlertFilter extends StatelessWidget {
-  const _AlertFilter({
-    required this.selected,
-    required this.onSelected,
-  });
+  const _AlertFilter({required this.selected, required this.onSelected});
 
-  final AlertType? selected;
-  final ValueChanged<AlertType?> onSelected;
+  final String? selected;
+  final ValueChanged<String?> onSelected;
 
   @override
   Widget build(BuildContext context) {
     return GlassCard(
       padding: const EdgeInsets.all(6),
-      child: Row(
-        children: [
-          _SegmentButton(
-            label: 'All',
-            active: selected == null,
-            onTap: () => onSelected(null),
-          ),
-          _SegmentButton(
-            label: 'Physical',
-            active: selected == AlertType.physical,
-            onTap: () => onSelected(AlertType.physical),
-          ),
-          _SegmentButton(
-            label: 'Cyber',
-            active: selected == AlertType.cyber,
-            onTap: () => onSelected(AlertType.cyber),
-          ),
-          _SegmentButton(
-            label: 'System',
-            active: selected == AlertType.system,
-            onTap: () => onSelected(AlertType.system),
-          ),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _SegmentButton(
+              label: 'All',
+              active: selected == null,
+              onTap: () => onSelected(null),
+            ),
+            _SegmentButton(
+              label: 'Crime',
+              active: selected == 'crime',
+              onTap: () => onSelected('crime'),
+            ),
+            _SegmentButton(
+              label: 'Accident',
+              active: selected == 'accident',
+              onTap: () => onSelected('accident'),
+            ),
+            _SegmentButton(
+              label: 'Weather',
+              active: selected == 'weather',
+              onTap: () => onSelected('weather'),
+            ),
+            _SegmentButton(
+              label: 'Scam',
+              active: selected == 'scam',
+              onTap: () => onSelected('scam'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -137,13 +150,15 @@ class _SegmentButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = active ? AppColors.neonCyan : AppColors.mist;
-    return Expanded(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          constraints: const BoxConstraints(minWidth: 76),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             color: active
@@ -157,9 +172,9 @@ class _SegmentButton extends StatelessWidget {
             label,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),
@@ -168,13 +183,11 @@ class _SegmentButton extends StatelessWidget {
 }
 
 class _AlertCard extends StatefulWidget {
-  const _AlertCard({
-    required this.alert,
-    required this.index,
-  });
+  const _AlertCard({required this.alert, this.userLat, this.userLng});
 
-  final AlertItem alert;
-  final int index;
+  final Alert alert;
+  final double? userLat;
+  final double? userLng;
 
   @override
   State<_AlertCard> createState() => _AlertCardState();
@@ -184,7 +197,6 @@ class _AlertCardState extends State<_AlertCard>
     with SingleTickerProviderStateMixin {
   bool _expanded = false;
   late final AnimationController _glowController;
-  late final Animation<double> _slideAnimation;
 
   @override
   void initState() {
@@ -193,10 +205,6 @@ class _AlertCardState extends State<_AlertCard>
       vsync: this,
       duration: const Duration(milliseconds: 1600),
     )..repeat(reverse: true);
-    _slideAnimation = CurvedAnimation(
-      parent: _glowController,
-      curve: Curves.easeOut,
-    );
   }
 
   @override
@@ -208,143 +216,130 @@ class _AlertCardState extends State<_AlertCard>
   @override
   Widget build(BuildContext context) {
     final alert = widget.alert;
-    final iconColor = alertTypeColor(alert.type);
-    final glowColor = alertSeverityGlow(alert.severity);
-    final hasNewGlow = alert.isNew;
+    final distance = widget.userLat != null && widget.userLng != null
+        ? alert.distanceLabelFrom(widget.userLat!, widget.userLng!)
+        : null;
 
     return Semantics(
       button: true,
-      label: 'Alert ${alert.title} ${alert.type.name} ${alert.severity.name}',
+      label: 'Alert ${alert.title} ${alert.typeLabel} ${alert.severity}',
       child: AnimatedBuilder(
         animation: _glowController,
         builder: (context, child) {
-          final slideOffset =
-              hasNewGlow ? 0.12 * (1 - _slideAnimation.value) : 0.0;
-          final glowStrength = hasNewGlow
-              ? 0.3 + (_glowController.value * 0.3)
-              : 0.18;
-          return Transform.translate(
-            offset: Offset(0, 24 * slideOffset),
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 350),
-              opacity: hasNewGlow ? _slideAnimation.value : 1.0,
-              child: GlassCard(
-                shadowColor: glowColor.withValues(alpha: glowStrength),
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: InkWell(
-                  onTap: () => setState(() => _expanded = !_expanded),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: iconColor.withValues(alpha: 0.16),
-                              border: Border.all(
-                                color: iconColor.withValues(alpha: 0.6),
-                              ),
-                            ),
-                            child: Icon(
-                              alertTypeIcon(alert.type),
-                              color: iconColor,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Column(
+          final glowStrength = 0.16 + (_glowController.value * 0.12);
+
+          return GlassCard(
+            shadowColor: alert.severityColor.withValues(alpha: glowStrength),
+            padding: EdgeInsets.zero,
+            child: InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: BorderRadius.circular(20),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      width: 5,
+                      decoration: BoxDecoration(
+                        color: alert.severityColor,
+                        borderRadius: const BorderRadius.horizontal(
+                          left: Radius.circular(20),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  alert.title,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
-                                      ?.copyWith(
-                                        color: AppColors.ice,
-                                        fontWeight: FontWeight.w700,
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: alert.severityColor.withValues(
+                                      alpha: 0.14,
+                                    ),
+                                    border: Border.all(
+                                      color: alert.severityColor.withValues(
+                                        alpha: 0.55,
                                       ),
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    alert.typeIcon,
+                                    color: alert.severityColor,
+                                    size: 21,
+                                  ),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  alert.shortDescription,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        color: AppColors.mist,
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        alert.title,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              color: AppColors.ice,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                       ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        alert.description.isEmpty
+                                            ? alert.typeLabel
+                                            : alert.description,
+                                        maxLines: _expanded ? null : 2,
+                                        overflow: _expanded
+                                            ? TextOverflow.visible
+                                            : TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(color: AppColors.mist),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Text(
-                            alert.timestamp,
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelLarge
-                                ?.copyWith(
-                                  color: AppColors.mist,
-                                  fontSize: 11,
+                            const SizedBox(height: AppSpacing.sm),
+                            Wrap(
+                              spacing: AppSpacing.sm,
+                              runSpacing: AppSpacing.xs,
+                              children: [
+                                _MetaPill(
+                                  icon: Icons.schedule,
+                                  label: alert.timeAgo,
                                 ),
-                          ),
-                        ],
+                                if (distance != null)
+                                  _MetaPill(
+                                    icon: Icons.near_me_outlined,
+                                    label: distance,
+                                  ),
+                                _MetaPill(
+                                  icon: Icons.report_gmailerrorred,
+                                  label: alert.severity,
+                                ),
+                                _MetaPill(
+                                  icon: Icons.verified_outlined,
+                                  label: alert.source,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 260),
-                        curve: Curves.easeOut,
-                        alignment: Alignment.topLeft,
-                        child: _expanded
-                            ? Padding(
-                                padding: const EdgeInsets.only(
-                                  top: AppSpacing.sm,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      alert.fullDescription,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(color: AppColors.ice),
-                                    ),
-                                    const SizedBox(height: AppSpacing.sm),
-                                    Wrap(
-                                      spacing: AppSpacing.sm,
-                                      runSpacing: AppSpacing.xs,
-                                      children: [
-                                        _ActionButton(
-                                          label: 'Navigate',
-                                          icon: Icons.navigation,
-                                          onTap: () {},
-                                        ),
-                                        _ActionButton(
-                                          label: 'Enable VPN',
-                                          icon: Icons.lock,
-                                          onTap: () {},
-                                        ),
-                                        _ActionButton(
-                                          label: 'Contact Help',
-                                          icon: Icons.support_agent,
-                                          onTap: () {},
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -355,35 +350,34 @@ class _AlertCardState extends State<_AlertCard>
   }
 }
 
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({required this.icon, required this.label});
 
-  final String label;
   final IconData icon;
-  final VoidCallback onTap;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 16, color: AppColors.ice),
-      label: Text(
-        label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: AppColors.ice,
-            ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.glassFill.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.glassStroke),
       ),
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        backgroundColor: AppColors.glassFill.withValues(alpha: 0.6),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppColors.glassStroke),
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.mist),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.mist,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -394,24 +388,34 @@ class _AlertEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: GlassCard(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.verified_user, color: AppColors.neonLime, size: 28),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'No alerts - you\'re safe',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.sizeOf(context).height * 0.18),
+        Center(
+          child: GlassCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.shield_outlined,
+                  color: AppColors.neonLime,
+                  size: 32,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'No alerts in your area',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: AppColors.ice,
                     fontWeight: FontWeight.w700,
                   ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -423,33 +427,43 @@ class _AlertError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: GlassCard(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, color: AppColors.danger, size: 28),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Unable to load alerts',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.sizeOf(context).height * 0.18),
+        Center(
+          child: GlassCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: AppColors.danger,
+                  size: 28,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Unable to load alerts',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: AppColors.ice,
                     fontWeight: FontWeight.w700,
                   ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ElevatedButton(
+                  onPressed: onRetry,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.neonCyan,
+                    foregroundColor: AppColors.midnight,
+                  ),
+                  child: const Text('Retry'),
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.sm),
-            ElevatedButton(
-              onPressed: onRetry,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.neonCyan,
-                foregroundColor: AppColors.midnight,
-              ),
-              child: const Text('Retry'),
-            ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -460,6 +474,7 @@ class _AlertShimmerList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: 4,
       separatorBuilder: (context, index) =>
           const SizedBox(height: AppSpacing.sm),

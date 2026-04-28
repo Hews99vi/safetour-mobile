@@ -5,18 +5,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../providers/sos_controller.dart';
+import '../../providers/confirm_sos_provider.dart';
 
 class SosConfirmationScreen extends ConsumerWidget {
   const SosConfirmationScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(sosStateProvider);
-    final title = state.phase == SosPhase.triggered
+    final holdState = ref.watch(sosStateProvider);
+    final submitState = ref.watch(sosProvider);
+    final isActive = submitState.phase == SosSubmitPhase.active;
+    final title = isActive
         ? 'SOS Activated'
+        : holdState.phase == SosPhase.triggered
+        ? 'SOS Ready'
         : 'SOS Ready';
-    final subtitle = state.phase == SosPhase.triggered
-        ? 'Emergency responders have been notified (mock).'
+    final subtitle = isActive
+        ? submitState.message ?? 'Help is on the way'
         : 'Hold the SOS button for 3 seconds to trigger.';
 
     return Scaffold(
@@ -56,19 +61,44 @@ class SosConfirmationScreen extends ConsumerWidget {
                       children: [
                         Text(
                           title,
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                color: AppColors.ice,
-                              ),
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(color: AppColors.ice),
                         ),
                         const SizedBox(height: 12),
                         Text(
                           subtitle,
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.mist,
-                              ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: AppColors.mist),
                         ),
+                        if (isActive &&
+                            submitState.sosId != null &&
+                            submitState.sosId!.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'SOS ID: ${submitState.sosId}',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: AppColors.mist),
+                          ),
+                        ],
                         const SizedBox(height: 24),
+                        if (isActive)
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () async {
+                                await ref
+                                    .read(sosProvider.notifier)
+                                    .cancelSos();
+                                if (context.mounted) {
+                                  Navigator.of(context).maybePop();
+                                }
+                              },
+                              child: const Text('Cancel SOS'),
+                            ),
+                          ),
+                        if (isActive) const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(

@@ -11,10 +11,7 @@ class AuthApi {
   }) async {
     final response = await _dio.post(
       '/auth/login',
-      data: {
-        'email': email,
-        'password': password,
-      },
+      data: {'email': email, 'password': password},
     );
     final data = response.data as Map<String, dynamic>;
     final token = data['token'] as String?;
@@ -31,11 +28,7 @@ class AuthApi {
   }) async {
     final response = await _dio.post(
       '/auth/register',
-      data: {
-        'name': name,
-        'email': email,
-        'password': password,
-      },
+      data: {'name': name, 'email': email, 'password': password},
     );
     final data = response.data as Map<String, dynamic>;
     final token = data['token'] as String?;
@@ -43,5 +36,9 @@ class AuthApi {
       throw Exception('Token not returned by API.');
     }
     return token;
+  }
+
+  Future<void> updateFcmToken(String token) async {
+    await _dio.post('/auth/fcm-token', data: {'token': token});
   }
 }

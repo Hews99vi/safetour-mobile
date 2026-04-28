@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_providers.dart';
+import 'notification_providers.dart';
 import 'safety_providers.dart';
 
 class AuthState {
@@ -31,10 +32,7 @@ class AuthController extends Notifier<AuthState> {
   @override
   AuthState build() => const AuthState();
 
-  Future<void> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> login({required String email, required String password}) async {
     final validation = _validateLogin(email: email, password: password);
     if (validation != null) {
       state = state.copyWith(errorMessage: validation);
@@ -42,10 +40,10 @@ class AuthController extends Notifier<AuthState> {
     }
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      await ref.read(authRepositoryProvider).login(
-            email: email,
-            password: password,
-          );
+      await ref
+          .read(authRepositoryProvider)
+          .login(email: email, password: password);
+      await ref.read(notificationServiceProvider).initialise();
       state = state.copyWith(isLoading: false, isAuthenticated: true);
     } catch (e) {
       state = state.copyWith(
@@ -73,11 +71,10 @@ class AuthController extends Notifier<AuthState> {
     }
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      await ref.read(authRepositoryProvider).register(
-        name: name,
-        email: email,
-        password: password,
-      );
+      await ref
+          .read(authRepositoryProvider)
+          .register(name: name, email: email, password: password);
+      await ref.read(notificationServiceProvider).initialise();
       state = state.copyWith(isLoading: false, isAuthenticated: true);
     } catch (e) {
       state = state.copyWith(
@@ -106,10 +103,7 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  String? _validateLogin({
-    required String email,
-    required String password,
-  }) {
+  String? _validateLogin({required String email, required String password}) {
     if (!_isEmailValid(email)) {
       return 'Enter a valid email.';
     }
@@ -153,5 +147,6 @@ class AuthController extends Notifier<AuthState> {
   }
 }
 
-final authControllerProvider =
-    NotifierProvider<AuthController, AuthState>(AuthController.new);
+final authControllerProvider = NotifierProvider<AuthController, AuthState>(
+  AuthController.new,
+);

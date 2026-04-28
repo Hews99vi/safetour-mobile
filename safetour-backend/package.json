@@ -1,0 +1,28 @@
+{
+  "name": "safetour-backend",
+  "version": "1.0.0",
+  "description": "Backend API for SafeTour Sri Lanka tourist safety app",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "express-validator": "^7.3.2",
+    "firebase-admin": "^13.0.2",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "morgan": "^1.10.0",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9",
+    "socket.io-client": "^4.8.3"
+  }
+}
