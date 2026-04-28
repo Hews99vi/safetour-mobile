@@ -30,7 +30,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authControllerProvider, (prev, next) {
-      if (next.errorMessage != null && next.errorMessage != prev?.errorMessage) {
+      if (next.errorMessage != null &&
+          next.errorMessage != prev?.errorMessage) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next.errorMessage!),
@@ -38,7 +39,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         );
       }
-      if (next.isAuthenticated && next.isAuthenticated != prev?.isAuthenticated) {
+      if (next.isAuthenticated &&
+          next.isAuthenticated != prev?.isAuthenticated) {
         context.go('/');
       }
     });
@@ -61,16 +63,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 20),
                       Text(
                         'Welcome back',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              color: AppColors.ice,
-                            ),
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(color: AppColors.ice),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         'Smart Safety for Smart Travelers',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.mist,
-                            ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(color: AppColors.mist),
                       ),
                       const SizedBox(height: 24),
                       _Field(
@@ -91,7 +92,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         onPressed: state.isLoading
                             ? null
                             : () {
-                                ref.read(authControllerProvider.notifier).login(
+                                ref
+                                    .read(authControllerProvider.notifier)
+                                    .login(
                                       email: _emailController.text,
                                       password: _passwordController.text,
                                     );
@@ -137,9 +140,9 @@ class _Logo extends StatelessWidget {
         const SizedBox(width: 12),
         Text(
           'SafeTour',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.ice,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(color: AppColors.ice),
         ),
       ],
     );
@@ -165,14 +168,14 @@ class _Field extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: AppColors.ice,
-          ),
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(color: AppColors.ice),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.mist,
-            ),
+        labelStyle: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: AppColors.mist),
         filled: true,
         fillColor: AppColors.glassFill,
         enabledBorder: OutlineInputBorder(
