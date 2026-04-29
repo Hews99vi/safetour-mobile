@@ -8,7 +8,7 @@ export function useSocket(token) {
   useEffect(() => {
     if (!token) return undefined;
 
-    const socket = io(import.meta.env.VITE_WS_BASE_URL || 'http://localhost:5000', {
+    const socket = io(import.meta.env.VITE_WS_BASE_URL || 'http://localhost:5001', {
       auth: { token },
       reconnectionAttempts: 5,
       transports: ['websocket'],

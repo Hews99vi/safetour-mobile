@@ -6,7 +6,8 @@ import api from '../services/api.js';
 import { useSos } from '../hooks/useSos.js';
 
 const SRI_LANKA_CENTER = { lat: 7.8731, lng: 80.7718 };
-const NATIONAL_RADIUS_METERS = 500000;
+const SAFE_ZONE_RADIUS_METERS = 50000;
+const ALERT_RADIUS_METERS = 500000;
 
 function timeAgo(dateStr) {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -97,7 +98,7 @@ export default function LiveMap() {
         params: {
           lat: SRI_LANKA_CENTER.lat,
           lng: SRI_LANKA_CENTER.lng,
-          radius: NATIONAL_RADIUS_METERS,
+          radius: SAFE_ZONE_RADIUS_METERS,
         },
       });
       setSafeZones(Array.isArray(response.data) ? response.data : []);
@@ -112,7 +113,7 @@ export default function LiveMap() {
         params: {
           lat: SRI_LANKA_CENTER.lat,
           lng: SRI_LANKA_CENTER.lng,
-          radius: NATIONAL_RADIUS_METERS,
+          radius: ALERT_RADIUS_METERS,
           limit: 50,
         },
       });

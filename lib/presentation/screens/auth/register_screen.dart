@@ -21,6 +21,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+  bool _passwordVisible = false;
+  bool _confirmPasswordVisible = false;
 
   @override
   void dispose() {
@@ -34,7 +36,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authControllerProvider, (prev, next) {
-      if (next.errorMessage != null && next.errorMessage != prev?.errorMessage) {
+      if (next.errorMessage != null &&
+          next.errorMessage != prev?.errorMessage) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next.errorMessage!),
@@ -42,7 +45,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         );
       }
-      if (next.isAuthenticated && next.isAuthenticated != prev?.isAuthenticated) {
+      if (next.isAuthenticated &&
+          next.isAuthenticated != prev?.isAuthenticated) {
         context.go('/');
       }
     });
@@ -70,24 +74,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           const SizedBox(width: 4),
                           Text(
                             'Create account',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: AppColors.ice,
-                                ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: AppColors.ice),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
                       Text(
                         'Smart Safety for Smart Travelers',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.mist,
-                            ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(color: AppColors.mist),
                       ),
                       const SizedBox(height: 24),
-                      _Field(
-                        controller: _nameController,
-                        label: 'Full name',
-                      ),
+                      _Field(controller: _nameController, label: 'Full name'),
                       const SizedBox(height: 16),
                       _Field(
                         controller: _emailController,
@@ -98,13 +98,40 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       _Field(
                         controller: _passwordController,
                         label: 'Password',
-                        obscureText: true,
+                        obscureText: !_passwordVisible,
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(
+                              () => _passwordVisible = !_passwordVisible,
+                            );
+                          },
+                          icon: Icon(
+                            _passwordVisible
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: AppColors.mist,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       _Field(
                         controller: _confirmController,
                         label: 'Confirm password',
-                        obscureText: true,
+                        obscureText: !_confirmPasswordVisible,
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(
+                              () => _confirmPasswordVisible =
+                                  !_confirmPasswordVisible,
+                            );
+                          },
+                          icon: Icon(
+                            _confirmPasswordVisible
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: AppColors.mist,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 24),
                       GlowButton(
@@ -113,7 +140,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         onPressed: state.isLoading
                             ? null
                             : () {
-                                ref.read(authControllerProvider.notifier).register(
+                                ref
+                                    .read(authControllerProvider.notifier)
+                                    .register(
                                       name: _nameController.text,
                                       email: _emailController.text,
                                       password: _passwordController.text,
@@ -146,12 +175,14 @@ class _Field extends StatelessWidget {
     required this.label,
     this.keyboardType,
     this.obscureText = false,
+    this.suffixIcon,
   });
 
   final TextEditingController controller;
   final String label;
   final TextInputType? keyboardType;
   final bool obscureText;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -159,14 +190,15 @@ class _Field extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: AppColors.ice,
-          ),
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(color: AppColors.ice),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.mist,
-            ),
+        suffixIcon: suffixIcon,
+        labelStyle: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: AppColors.mist),
         filled: true,
         fillColor: AppColors.glassFill,
         enabledBorder: OutlineInputBorder(

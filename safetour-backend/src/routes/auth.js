@@ -52,6 +52,25 @@ router.post(
 );
 
 router.post(
+  '/forgot-password',
+  [emailValidation],
+  authController.forgotPassword
+);
+
+router.post(
+  '/reset-password',
+  [
+    body('token')
+      .isString()
+      .trim()
+      .notEmpty()
+      .withMessage('Reset token is required'),
+    passwordValidation
+  ],
+  authController.resetPassword
+);
+
+router.post(
   '/logout',
   authMiddleware,
   [

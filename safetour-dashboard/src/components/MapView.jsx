@@ -13,7 +13,11 @@ import {
 import AlertBadge from './AlertBadge.jsx';
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY || '';
-const TILE_URL = `https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`;
+const HAS_MAPTILER_KEY = Boolean(
+  MAPTILER_KEY && MAPTILER_KEY !== 'replace-with-your-maptiler-key',
+);
+const MAPTILER_TILE_URL = `https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`;
+const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 const sosIcon = new L.DivIcon({
   className: '',
@@ -230,14 +234,26 @@ export default function MapView({
       style={{ background: '#1e293b' }}
     >
       <LayersControl position="topright">
-        <LayersControl.BaseLayer checked name="Streets">
+        <LayersControl.BaseLayer checked name={HAS_MAPTILER_KEY ? 'MapTiler Streets' : 'OpenStreetMap'}>
           <TileLayer
-            attribution='&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url={TILE_URL}
-            tileSize={512}
-            zoomOffset={-1}
+            attribution={
+              HAS_MAPTILER_KEY
+                ? '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }
+            url={HAS_MAPTILER_KEY ? MAPTILER_TILE_URL : OSM_TILE_URL}
+            tileSize={HAS_MAPTILER_KEY ? 512 : 256}
+            zoomOffset={HAS_MAPTILER_KEY ? -1 : 0}
           />
         </LayersControl.BaseLayer>
+        {HAS_MAPTILER_KEY && (
+          <LayersControl.BaseLayer name="OpenStreetMap">
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url={OSM_TILE_URL}
+            />
+          </LayersControl.BaseLayer>
+        )}
         <LayersControl.Overlay checked name="SOS Reports">
           <LayerGroup>
             <SosMarkers sosReports={sosReports} onRespond={onRespond} />

@@ -7,5 +7,10 @@ abstract class AuthRepository {
     required String password,
   });
 
+  Future<String> resetPassword({
+    required String email,
+    required String password,
+  });
+
   Future<void> updateFcmToken(String token);
 }

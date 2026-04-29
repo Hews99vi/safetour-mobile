@@ -1,11 +1,13 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const User = require('../models/User');
 
 const BCRYPT_ROUNDS = 12;
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL = '30d';
+const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
 
 function sendValidationErrors(req, res) {
   const errors = validationResult(req);
@@ -68,6 +70,31 @@ function toAccessTokenResponse(user) {
   };
 }
 
+function isBcryptHash(value) {
+  return typeof value === 'string' && /^\$2[aby]\$\d{2}\$/.test(value);
+}
+
+async function verifyPassword(user, password) {
+  if (!user) return false;
+
+  if (isBcryptHash(user.passwordHash)) {
+    return bcrypt.compare(password, user.passwordHash);
+  }
+
+  // Early scaffold accounts stored plain text in passwordHash. Upgrade them on
+  // the next successful login instead of locking the user out.
+  if (user.passwordHash === password) {
+    user.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    return true;
+  }
+
+  return false;
+}
+
+function hashResetToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 async function register(req, res, next) {
   try {
     if (sendValidationErrors(req, res)) return;
@@ -105,7 +132,7 @@ async function login(req, res, next) {
     const { password } = req.body;
 
     const user = await User.findOne({ email });
-    const isPasswordValid = user ? await bcrypt.compare(password, user.passwordHash) : false;
+    const isPasswordValid = await verifyPassword(user, password);
 
     if (!user || !isPasswordValid) {
       return res.status(401).json({ error: 'Unauthorized', message: 'Invalid credentials', statusCode: 401 });
@@ -177,4 +204,71 @@ async function updateFcmToken(req, res, next) {
   }
 }
 
-module.exports = { register, login, refresh, logout, updateFcmToken };
+async function forgotPassword(req, res, next) {
+  try {
+    if (sendValidationErrors(req, res)) return;
+
+    const email = req.body.email.toLowerCase();
+    const user = await User.findOne({ email });
+    const message = 'If an account exists for this email, password reset instructions have been sent.';
+
+    if (!user) {
+      return res.json({ success: true, message });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordTokenHash = hashResetToken(resetToken);
+    user.resetPasswordExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+    await user.save();
+
+    console.log(`Password reset token for ${email}: ${resetToken}`);
+
+    const response = { success: true, message };
+    if (process.env.NODE_ENV !== 'production') {
+      response.resetToken = resetToken;
+    }
+
+    return res.json(response);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function resetPassword(req, res, next) {
+  try {
+    if (sendValidationErrors(req, res)) return;
+
+    const { token, password } = req.body;
+    const user = await User.findOne({
+      resetPasswordTokenHash: hashResetToken(token),
+      resetPasswordExpiresAt: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        error: 'ValidationError',
+        message: 'Password reset token is invalid or expired',
+        statusCode: 400
+      });
+    }
+
+    user.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    user.resetPasswordTokenHash = undefined;
+    user.resetPasswordExpiresAt = undefined;
+    await user.save();
+
+    return res.json({ success: true, message: 'Password has been reset successfully.' });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = {
+  register,
+  login,
+  refresh,
+  logout,
+  updateFcmToken,
+  forgotPassword,
+  resetPassword
+};

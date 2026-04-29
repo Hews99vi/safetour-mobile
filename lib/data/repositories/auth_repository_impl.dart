@@ -29,5 +29,13 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<String> resetPassword({
+    required String email,
+    required String password,
+  }) {
+    return _api.resetPassword(email: email, password: password);
+  }
+
+  @override
   Future<void> updateFcmToken(String token) => _api.updateFcmToken(token);
 }

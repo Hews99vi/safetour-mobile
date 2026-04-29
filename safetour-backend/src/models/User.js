@@ -8,7 +8,9 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ['tourist', 'admin'], default: 'tourist' },
     fcmToken: { type: String },
     language: { type: String, default: 'en', trim: true },
-    lastLoginAt: { type: Date }
+    lastLoginAt: { type: Date },
+    resetPasswordTokenHash: { type: String },
+    resetPasswordExpiresAt: { type: Date }
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

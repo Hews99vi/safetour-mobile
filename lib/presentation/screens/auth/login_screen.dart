@@ -19,6 +19,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _passwordVisible = false;
 
   @override
   void dispose() {
@@ -83,7 +84,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       _Field(
                         controller: _passwordController,
                         label: 'Password',
-                        obscureText: true,
+                        obscureText: !_passwordVisible,
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(
+                              () => _passwordVisible = !_passwordVisible,
+                            );
+                          },
+                          icon: Icon(
+                            _passwordVisible
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: AppColors.mist,
+                          ),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: state.isLoading
+                              ? null
+                              : () => _showResetPasswordDialog(context),
+                          child: const Text('Forgot password?'),
+                        ),
                       ),
                       const SizedBox(height: 24),
                       GlowButton(
@@ -116,6 +139,128 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showResetPasswordDialog(BuildContext context) async {
+    final emailController = TextEditingController(text: _emailController.text);
+    final passwordController = TextEditingController();
+    final confirmController = TextEditingController();
+    var passwordVisible = false;
+    var confirmVisible = false;
+    var isSubmitting = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> submit() async {
+              setDialogState(() => isSubmitting = true);
+              final message = await ref
+                  .read(authControllerProvider.notifier)
+                  .resetPassword(
+                    email: emailController.text,
+                    password: passwordController.text,
+                    confirmPassword: confirmController.text,
+                  );
+
+              if (!context.mounted) return;
+              setDialogState(() => isSubmitting = false);
+
+              if (message == null) return;
+
+              Navigator.of(dialogContext).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(message),
+                  backgroundColor: AppColors.steel,
+                ),
+              );
+            }
+
+            return AlertDialog(
+              backgroundColor: AppColors.deepSpace,
+              title: const Text(
+                'Reset password',
+                style: TextStyle(color: AppColors.ice),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _Field(
+                      controller: emailController,
+                      label: 'Email',
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 14),
+                    _Field(
+                      controller: passwordController,
+                      label: 'New password',
+                      obscureText: !passwordVisible,
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          setDialogState(
+                            () => passwordVisible = !passwordVisible,
+                          );
+                        },
+                        icon: Icon(
+                          passwordVisible
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: AppColors.mist,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _Field(
+                      controller: confirmController,
+                      label: 'Confirm new password',
+                      obscureText: !confirmVisible,
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          setDialogState(
+                            () => confirmVisible = !confirmVisible,
+                          );
+                        },
+                        icon: Icon(
+                          confirmVisible
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: AppColors.mist,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isSubmitting ? null : submit,
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Reset'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    emailController.dispose();
+    passwordController.dispose();
+    confirmController.dispose();
   }
 }
 
@@ -155,12 +300,14 @@ class _Field extends StatelessWidget {
     required this.label,
     this.keyboardType,
     this.obscureText = false,
+    this.suffixIcon,
   });
 
   final TextEditingController controller;
   final String label;
   final TextInputType? keyboardType;
   final bool obscureText;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -173,6 +320,7 @@ class _Field extends StatelessWidget {
       ).textTheme.bodyMedium?.copyWith(color: AppColors.ice),
       decoration: InputDecoration(
         labelText: label,
+        suffixIcon: suffixIcon,
         labelStyle: Theme.of(
           context,
         ).textTheme.bodySmall?.copyWith(color: AppColors.mist),
